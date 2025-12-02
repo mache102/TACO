@@ -47,6 +47,7 @@ def parse_args_for_inference(argv):
     parser.add_argument(
         "--checkpoint", type=str, default='0.0004.pth.tar', help="path of the pretrained checkpoint"
     )
+    parser.add_argument("--out", type=str, required=True, help="output directory")
 
     args = parser.parse_args(argv)
     return args
@@ -105,7 +106,8 @@ def main(argv):
         }
 
     image_folder_name = args.image_folder_root.split('/')[-1]
-    save_folder = f'./compression_{image_folder_name}'
+    # save_folder = f'./compression_{image_folder_name}'
+    save_folder = os.path.join("out", args.out)
     if os.path.exists(save_folder):
         shutil.rmtree(save_folder)
     try:
@@ -126,7 +128,7 @@ def main(argv):
 
     for img_name, image, caption in tqdm(image_caption_dataset, desc=f"compress :") :
     
-        x = image.unsqueeze(0)
+        x = image.unsqueeze(0).to(device)
 
         _, _, H, W = x.shape
         pad_h = 0
@@ -197,6 +199,7 @@ def main(argv):
 
     print(f"\nBPP: {mean_csv['bpp']}, PSNR: {mean_csv['psnr']}, MS-SSIM: {mean_csv['ms_ssim']}, LPIPS: {mean_csv['lpips']}\n")
 
+    print(f" saving to {save_folder}/mean_stat.json")
     with open(f'{save_folder}/mean_stat.json', 'w') as f:
         json.dump(mean_csv, f, indent=4)
 
