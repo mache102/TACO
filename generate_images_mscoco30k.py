@@ -43,6 +43,7 @@ def parse_args_for_inference(argv):
     parser.add_argument(
         "--checkpoint", type=str, default='./checkpoint/0.0004.pth.tar', help="path of the pretrained checkpoint"
     )
+    parser.add_argument("--out", type=str, required=True, help="output directory")
 
     args = parser.parse_args(argv)
     return args
@@ -107,7 +108,8 @@ def main(argv):
         'lpips': []
         }
 
-    save_folder = f'./compression_mscoco_val30k'
+    # save_folder = f'./compression_mscoco_val30k'
+    save_folder = os.path.join("out", "mscoco_val30k", args.out)
     if os.path.exists(save_folder):
         shutil.rmtree(save_folder)
     try:
@@ -131,7 +133,7 @@ def main(argv):
         img_path = f'{args.image_folder_root}/{img_name}'
 
         img = torchvision.transforms.ToTensor()(Image.open(img_path).convert('RGB')).to(device)
-        x = img.unsqueeze(0)
+        x = img.unsqueeze(0).to(device)
 
         _, _, H, W = x.shape
         pad_h = 0
@@ -204,6 +206,7 @@ def main(argv):
         final_caption = best_image['caption']
         print(f'Checkpoint: {params_name}, img_name: {img_name}, Caption: {final_caption}')
         
+        print(f"type and shape of bestimage: {type(best_image['image'])}, {best_image['image'].shape}")
         torchvision.utils.save_image(best_image['image'], f'{save_folder}/figures/{img_name}', nrow=1)    
         mean_csv['bpp'] += bpp
         mean_csv['psnr'] += psnr

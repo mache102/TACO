@@ -107,7 +107,7 @@ def main(argv):
 
     image_folder_name = args.image_folder_root.split('/')[-1]
     # save_folder = f'./compression_{image_folder_name}'
-    save_folder = os.path.join("out", args.out)
+    save_folder = os.path.join("out", "kodak", args.out)
     if os.path.exists(save_folder):
         shutil.rmtree(save_folder)
     try:

@@ -37,9 +37,8 @@ results will be in ~/datasets/kodak/dataset/ (kodim01.png ... kodim24.png)
 ## deps
 
 ```
-# Core ML frameworks 
+# at the time of codebase release, torch 2.2 would've been used, butwe are forced to use 2.6+ due to a CVE in earlier versions
 
-# the first ver of the code was released in may 2024, around the same time as pytorch 2.3.0. this means it's unlikely to have used features from pytorch 2.3.0 or later.
 torch==2.6.0
 torchvision
 transformers>=4.20.0  
@@ -82,7 +81,7 @@ Run:
 # python -u generate_images_using_image_cap_dataset.py --image_folder_root (path for original image data) --checkpoint ckpts/lambda_0.0004.pth.tar
 # e.g. python -u generate_mscoco30k.py --image_folder_root /data/MSCOCO/val2014 --checkpoint /checkpoint/pre_trained_ckpt.pth.tar
 
-python -u generate_images_mscoco30k.py --image_folder_root /datasets/MSCOCO/val2014 --checkpoint ckpts/lambda_0.0004.pth.tar
+python -u generate_images_mscoco30k.py --image_folder_root /home/ying/datasets/MSCOCO/val2014 --checkpoint ckpts/lambda_0.0004.pth.tar --out lambda_0.0004
 ```
 
 
