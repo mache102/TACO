@@ -138,3 +138,36 @@ git add .
 git commit -m "your commit message"
 git push origin main
 ```
+
+
+if git creds are needed:
+
+```bash
+# list releases
+curl -s https://api.github.com/repos/git-ecosystem/git-credential-manager/releases/latest | grep browser_download_url
+
+#pick a .deb for linux
+wget https://github.com/git-ecosystem/git-credential-manager/releases/download/v2.6.1/gcm-linux_amd64.2.6.1.deb
+
+sudo dpkg -i gcm-linux_amd64.2.6.1.deb
+
+git config --global credential.helper manager
+
+
+gpg --full-generate-key
+# pick rsa + rsa
+# key size: 4096
+# expiration: 0
+# ...
+
+gpg --list-secret-keys --keyid-format=long
+# copy the long key id after sec rsa4096/
+
+sudo apt install pass
+pass init ABCDEF1234567890
+
+git config --global credential.credentialStore gpg
+
+git-credential-manager-core configure
+
+```
