@@ -83,23 +83,7 @@ Run:
 
 python -u generate_images_mscoco30k.py --image_folder_root /home/ying/datasets/MSCOCO/val2014 --checkpoint ckpts/lambda_0.0004.pth.tar --out lambda_0.0004
 ```
-
-
-began running at 17:36. 
-
-ValueError: Due to a serious vulnerability issue in `torch.load`, even with `weights_only=True`, we now require users to upgrade torch to at least v2.6 in order to use the function. This version restriction does not apply when loading files with safetensors.
-
-but now we get this:
-Traceback (most recent call last):
-  File "/home/ying/experiments/TACO/generate_images_mscoco30k.py", line 237, in <module>
-    main(sys.argv[1:])
-  File "/home/ying/experiments/TACO/generate_images_mscoco30k.py", line 133, in main
-    img = torchvision.transforms.ToTensor()(Image.open(img_path).convert('RGB')).to(device)
-                                            ^^^^^^^^^^^^^^^^^^^^
-  File "/home/ying/experiments/TACO/env/lib/python3.12/site-packages/PIL/Image.py", line 3493, in open
-    fp = builtins.open(filename, "rb")
-         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-FileNotFoundError: [Errno 2] No such file or directory: '/datasets/MSCOCO/val2014/COCO_val2014_000000000073.jpg'
+This may take **~5h** for the full 30k images.
 
 ## running (kodak)
 
@@ -112,16 +96,6 @@ In `generate_images_using_image_cap_dataset.py`, add `.to(device)` to `x`.
 We also added an `--out` argument to specify output directory.
 
 
-Also this script for easily iterating over all lambda ckpts:
-
-```bash
-#!/bin/bash
-declare -a lambdas=("0.0004" "0.0008" "0.0016" "0.004" "0.009" "0.015")
-
-for lambda in "${lambdas[@]}"; do
-    python -u generate_images_using_image_cap_dataset.py --image_folder_root /home/ying/datasets/kodak/dataset/ --image_cap_dict_root ./materials/kodak_ofa.json --checkpoint ./ckpts/lambda_${lambda}.pth.tar --out kodak/lambda_${lambda}
-done
-```
 
 
 ## other

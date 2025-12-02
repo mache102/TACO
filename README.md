@@ -1,5 +1,7 @@
 # TACO: <u>T</u>ext-<u>A</u>daptive <u>CO</u>mpression
 
+## This is a fork with instructions for ease of setup and running. See [setup.md](./setup.md)
+
 ### [Paper](https://arxiv.org/abs/2403.02944) | [Project page](https://taco-nic.github.io)
 
 <br>
