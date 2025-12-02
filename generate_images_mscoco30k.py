@@ -48,6 +48,9 @@ def parse_args_for_inference(argv):
     parser.add_argument(
         "--num_images", type=int, default=5000, help="Number of images to evaluate (subsampled from 30k, default 5000)"
     )
+    parser.add_argument(
+        "--use_coco5k", action='store_true', help="Use COCO 5k val2017 images and captions (from annotations/captions_val2017.json and instances_val2017.json)"
+    )
     args = parser.parse_args(argv)
     return args
 
@@ -62,19 +65,41 @@ def main(argv):
     CLIP_tokenizer = AutoTokenizer.from_pretrained(clip_model_name)
 
 
-    with open('./materials/mscoco_30k_list.json', 'r') as f:
-        image_list = json.load(f)
-    image_list.sort()
-
-    # Subsample image_list if requested
-    N = args.num_images
-    total = 30000
-    step = max(1, math.floor(total / N))
-    if N < len(image_list):
-        image_list = image_list[::step]
-
-    with open('./materials/mscoco_val41k_img_cap_pair.json', 'r') as f:
-        image_cap_dict = json.load(f)
+    if args.use_coco5k:
+        # Use COCO 5k val2017 images and captions
+        import collections
+        ann_dir = '/home/ying/datasets/annotations'
+        captions_path = os.path.join(ann_dir, 'captions_val2017.json')
+        instances_path = os.path.join(ann_dir, 'instances_val2017.json')
+        with open(captions_path, 'r') as f:
+            coco_caps = json.load(f)
+        # Build image_id to file_name mapping
+        imgid_to_filename = {img['id']: img['file_name'] for img in coco_caps['images']}
+        # Build image_name to captions mapping
+        image_cap_dict = collections.defaultdict(list)
+        for ann in coco_caps['annotations']:
+            fname = imgid_to_filename[ann['image_id']]
+            image_cap_dict[fname].append(ann['caption'])
+        # List of image file names (sorted for reproducibility)
+        image_list = sorted(list(image_cap_dict.keys()))
+        # Subsample if requested
+        N = args.num_images
+        total = 5000
+        step = max(1, math.floor(total / N))
+        if N < len(image_list):
+            image_list = image_list[::step]
+    else:
+        with open('./materials/mscoco_30k_list.json', 'r') as f:
+            image_list = json.load(f)
+        image_list.sort()
+        # Subsample image_list if requested
+        N = args.num_images
+        total = 30000
+        step = max(1, math.floor(total / N))
+        if N < len(image_list):
+            image_list = image_list[::step]
+        with open('./materials/mscoco_val41k_img_cap_pair.json', 'r') as f:
+            image_cap_dict = json.load(f)
 
     params_name = f'{args.checkpoint}'
 
@@ -138,10 +163,8 @@ def main(argv):
         'lpips':0.0
     }
 
-    for img_name in tqdm(image_list, desc=f"compress:") :
-    
+    for img_name in tqdm(image_list, desc=f"compress:"):
         img_path = f'{args.image_folder_root}/{img_name}'
-
         img = torchvision.transforms.ToTensor()(Image.open(img_path).convert('RGB')).to(device)
         x = img.unsqueeze(0).to(device)
 
@@ -154,22 +177,23 @@ def main(argv):
             pad_w = 64 * (W // 64 + 1) - W
 
         x_padded = F.pad(x, (0, pad_w, 0, pad_h), mode='constant', value=0)
-            
+
         pred_image_list = []
         pred_bpp_list = []
-        
-        for caption in image_cap_dict[img_name] :    
+
+        # For COCO5k, image_cap_dict is a defaultdict(list)
+        for caption in image_cap_dict[img_name]:
             clip_token = CLIP_tokenizer([caption], padding="max_length", max_length=38, truncation=True, return_tensors="pt").to(device)
             text_embeddings = CLIP_text_model(**clip_token).last_hidden_state
-            
+
             out_enc = net.compress(x_padded, text_embeddings)
             shape = out_enc["shape"]
-            
+
             output = os.path.join(f'{save_folder}/temp', f'{img_name}')
             with Path(output).open("wb") as f:
                 write_uints(f, (H, W))
                 write_body(f, shape, out_enc["strings"])
-            
+
             size = filesize(output)
             bpp = float(size) * 8 / (H * W)
 
@@ -180,10 +204,10 @@ def main(argv):
             out = net.decompress(strings, shape, text_embeddings)
             x_hat = out["x_hat"]
             x_hat = x_hat[:, :, 0 : original_size[0], 0 : original_size[1]]
-            
+
             pred_image_list.append(x_hat.detach().clone())
             pred_bpp_list.append(bpp)
-        
+
         best_image = {
             'BPP':0.0,
             'PSNR': 0.0,
@@ -191,33 +215,33 @@ def main(argv):
             'LPIPS':1e6, # this was originally 0, which is incorrect for lpips minimization
             'caption': "",
             'image': None
-        }    
-            
+        }
+
         for i, pred_image in enumerate(pred_image_list):
             bpp = pred_bpp_list[i]
-            
+
             psnr = compute_psnr(x, pred_image)
             try:
                 ms_ssim = ms_ssim_func(x, pred_image, data_range=1.).item()
             except:
                 ms_ssim = ms_ssim_func(torchvision.transforms.Resize(256)(x), torchvision.transforms.Resize(256)(pred_image), data_range=1.).item()
-                
+
             lpips_score = loss_fn_alex(x, pred_image).item()
             # print(f" score (lpips): {lpips_score} ")
-            
-            # we choose the lowest lpips image as best 
-            if best_image['LPIPS'] > lpips_score :
+
+            # we choose the lowest lpips image as best
+            if best_image['LPIPS'] > lpips_score:
                 best_image['BPP']=bpp
                 best_image['PSNR']=psnr
                 best_image['MS-SSIM']=ms_ssim
                 best_image['LPIPS']=lpips_score
                 best_image['caption'] = image_cap_dict[img_name][i]
-                best_image['image'] = pred_image.detach().clone()   
-            
+                best_image['image'] = pred_image.detach().clone()
+
         final_caption = best_image['caption']
         print(f'Checkpoint: {params_name}, img_name: {img_name}, Caption: {final_caption}')
-        
-        torchvision.utils.save_image(best_image['image'], f'{save_folder}/figures/{img_name}', nrow=1)    
+
+        torchvision.utils.save_image(best_image['image'], f'{save_folder}/figures/{img_name}', nrow=1)
         mean_csv['bpp'] += bpp
         mean_csv['psnr'] += psnr
         mean_csv['ms_ssim'] += ms_ssim
@@ -227,7 +251,7 @@ def main(argv):
         stat_csv['bpp'].append(bpp)
         stat_csv['psnr'].append(psnr)
         stat_csv['ms_ssim'].append(ms_ssim)
-        stat_csv['lpips'].append(lpips_score)  
+        stat_csv['lpips'].append(lpips_score)
 
     shutil.rmtree(f"{save_folder}/temp")
 

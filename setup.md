@@ -106,7 +106,11 @@ In `generate_images_using_image_cap_dataset.py`, add `.to(device)` to `x`.
 We also added an `--out` argument to specify output directory.
 
 
+## running (coco 5k)
 
+```bash
+python -u generate_images_mscoco30k.py --image_folder_root /home/ying/datasets/val2017 --checkpoint ckpts/lambda_0.0004.pth.tar --out lambda_0.0004 --use_coco5k
+```
 
 ## other
 if you cloned the original repo, you can redirect its origin to your own fork:
