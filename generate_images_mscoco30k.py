@@ -178,7 +178,7 @@ def main(argv):
             'BPP':0.0,
             'PSNR': 0.0,
             'MS-SSIM': 0.0,
-            'LPIPS':0.0,
+            'LPIPS':1e6, # this was originally 0, which is incorrect for lpips minimization
             'caption': "",
             'image': None
         }    
@@ -193,6 +193,7 @@ def main(argv):
                 ms_ssim = ms_ssim_func(torchvision.transforms.Resize(256)(x), torchvision.transforms.Resize(256)(pred_image), data_range=1.).item()
                 
             lpips_score = loss_fn_alex(x, pred_image).item()
+            # print(f" score (lpips): {lpips_score} ")
             
             # we choose the lowest lpips image as best 
             if best_image['LPIPS'] > lpips_score :
@@ -206,7 +207,6 @@ def main(argv):
         final_caption = best_image['caption']
         print(f'Checkpoint: {params_name}, img_name: {img_name}, Caption: {final_caption}')
         
-        print(f"type and shape of bestimage: {type(best_image['image'])}, {best_image['image'].shape}")
         torchvision.utils.save_image(best_image['image'], f'{save_folder}/figures/{img_name}', nrow=1)    
         mean_csv['bpp'] += bpp
         mean_csv['psnr'] += psnr
