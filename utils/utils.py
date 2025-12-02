@@ -14,7 +14,7 @@ from torchvision.transforms import ToPILImage
 from torchvision import transforms
 import torch.nn as nn
 
-import lpips, clip
+import lpips
 
 from transformers import CLIPTextModelWithProjection, CLIPVisionModelWithProjection 
 
