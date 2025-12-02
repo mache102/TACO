@@ -1,0 +1,16 @@
+# at the time of codebase release, torch 2.2 would've been used, butwe are forced to use 2.6+ due to a CVE in earlier versions
+
+torch==2.6.0
+torchvision
+transformers>=4.20.0  
+  
+# Image processing and metrics  
+Pillow>=9.0.0  
+lpips>=0.1.4  
+pytorch-msssim>=1.0.0  
+  
+# Data handling  
+pandas>=1.4.0  
+numpy>=1.21.0  
+tqdm>=4.64.0  
+compressai
