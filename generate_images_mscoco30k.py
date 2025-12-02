@@ -45,6 +45,9 @@ def parse_args_for_inference(argv):
     )
     parser.add_argument("--out", type=str, required=True, help="output directory")
 
+    parser.add_argument(
+        "--num_images", type=int, default=5000, help="Number of images to evaluate (subsampled from 30k, default 5000)"
+    )
     args = parser.parse_args(argv)
     return args
 
@@ -62,6 +65,13 @@ def main(argv):
     with open('./materials/mscoco_30k_list.json', 'r') as f:
         image_list = json.load(f)
     image_list.sort()
+
+    # Subsample image_list if requested
+    N = args.num_images
+    total = 30000
+    step = max(1, math.floor(total / N))
+    if N < len(image_list):
+        image_list = image_list[::step]
 
     with open('./materials/mscoco_val41k_img_cap_pair.json', 'r') as f:
         image_cap_dict = json.load(f)

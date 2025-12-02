@@ -21,6 +21,16 @@ mkdir MSCOCO
 unzip val2014.zip -d MSCOCO
 ```
 
+### coco 5k (eval)
+
+```bash
+wget http://images.cocodataset.org/zips/val2017.zip
+unzip val2017.zip
+
+wget http://images.cocodataset.org/annotations/annotations_trainval2017.zip
+unzip annotations_trainval2017.zip
+```
+
 ### kodak (eval)
 https://r0k.us/graphics/kodak/
 
