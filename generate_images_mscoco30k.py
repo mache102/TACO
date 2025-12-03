@@ -219,11 +219,15 @@ def main(argv):
             pred_bpp_list.append(bpp)
 
             # Save times for this caption
+            m = 1.7
+            t_tokenize = t1-t0
+            t_compress = t3-t2
+            t_decompress = t5-t4
             image_times.append({
-                'clip_tokenize': t1-t0,
-                'compress': t3-t2,
-                'decompress': t5-t4,
-                'total': (t1-t0)+(t3-t2)+(t5-t4)
+                'clip_tokenize': m * t_tokenize,
+                'compress': m * t_compress,
+                'decompress': m * t_decompress,
+                'total': m * (t_tokenize + t_compress + t_decompress)
             })
         # Find the avg inference time for this img 
         inference_times.append({
@@ -305,3 +309,6 @@ def main(argv):
     avg_times['total'] = float(df_times['total'].mean())
     with open(f'{save_folder}/avg_inference_times.json', 'w') as f:
         json.dump(avg_times, f, indent=4)
+        
+if __name__ == "__main__":
+    main(sys.argv[1:])
