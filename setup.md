@@ -45,25 +45,6 @@ results will be in ~/datasets/kodak/dataset/ (kodim01.png ... kodim24.png)
 ```
 
 ## deps
-
-```
-# at the time of codebase release, torch 2.2 would've been used, butwe are forced to use 2.6+ due to a CVE in earlier versions
-
-torch==2.6.0
-torchvision
-transformers>=4.20.0  
-  
-# Image processing and metrics  
-Pillow>=9.0.0  
-lpips>=0.1.4  
-pytorch-msssim>=1.0.0  
-  
-# Data handling  
-pandas>=1.4.0  
-numpy>=1.21.0  
-tqdm>=4.64.0  
-compressai
-```
 ```bash
 python -m venv env
 source env/bin/activate
@@ -72,25 +53,11 @@ pip install -r requirements.txt
 pip install compressai
 
 ```
-## edits
-
-go to utils/utils.py 
-in this line:
-
-import lpips, clip
-remove clip, since it's not used at all
-
-
-
-
 ## running (mscoco)
 
 Run:
 
 ```bash
-# python -u generate_images_using_image_cap_dataset.py --image_folder_root (path for original image data) --checkpoint ckpts/lambda_0.0004.pth.tar
-# e.g. python -u generate_mscoco30k.py --image_folder_root /data/MSCOCO/val2014 --checkpoint /checkpoint/pre_trained_ckpt.pth.tar
-
 python -u generate_images_mscoco30k.py --image_folder_root /home/ying/datasets/MSCOCO/val2014 --checkpoint ckpts/lambda_0.0004.pth.tar --out lambda_0.0004
 ```
 This may take **~5h** for the full 30k images.
@@ -156,5 +123,3 @@ pass init ABCDEF1234567890
 git config --global credential.credentialStore gpg
 
 git-credential-manager-core configure
-
-```
