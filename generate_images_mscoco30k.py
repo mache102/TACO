@@ -2,9 +2,11 @@ import os, sys
 import torch, torchvision
 import torch.nn.functional as F
 
+import collections
 
 from transformers import CLIPTextModel, AutoTokenizer
 import lpips
+import time 
 from PIL import Image
 
 from models import TACO
@@ -51,6 +53,9 @@ def parse_args_for_inference(argv):
     parser.add_argument(
         "--use_coco5k", action='store_true', help="Use COCO 5k val2017 images and captions (from annotations/captions_val2017.json and instances_val2017.json)"
     )
+    parser.add_argument(
+        "--use_coco50", action='store_true', help="Use COCO 50 images and captions (for quick testing)"
+    )
     args = parser.parse_args(argv)
     return args
 
@@ -64,30 +69,24 @@ def main(argv):
     CLIP_text_model.requires_grad_(False)
     CLIP_tokenizer = AutoTokenizer.from_pretrained(clip_model_name)
 
-
-    if args.use_coco5k:
+    if args.use_coco50:
+        # Use COCO 50 images and captions
+        coco50_path = './materials/coco_50_imgs.txt'
+        with open(coco50_path, 'r') as f:
+            coco50_imgs = set([line.strip() for line in f if line.strip()])
         # Use COCO 5k val2017 images and captions
-        import collections
         ann_dir = '/home/ying/datasets/annotations'
         captions_path = os.path.join(ann_dir, 'captions_val2017.json')
-        instances_path = os.path.join(ann_dir, 'instances_val2017.json')
         with open(captions_path, 'r') as f:
             coco_caps = json.load(f)
-        # Build image_id to file_name mapping
         imgid_to_filename = {img['id']: img['file_name'] for img in coco_caps['images']}
-        # Build image_name to captions mapping
         image_cap_dict = collections.defaultdict(list)
         for ann in coco_caps['annotations']:
             fname = imgid_to_filename[ann['image_id']]
-            image_cap_dict[fname].append(ann['caption'])
-        # List of image file names (sorted for reproducibility)
-        image_list = sorted(list(image_cap_dict.keys()))
-        # Subsample if requested
-        N = args.num_images
-        total = 5000
-        step = max(1, math.floor(total / N))
-        if N < len(image_list):
-            image_list = image_list[::step]
+            if fname in coco50_imgs:
+                image_cap_dict[fname].append(ann['caption'])
+        image_list = sorted(list(coco50_imgs & set(image_cap_dict.keys())))
+        # No subsampling for coco50
     else:
         with open('./materials/mscoco_30k_list.json', 'r') as f:
             image_list = json.load(f)
@@ -144,17 +143,17 @@ def main(argv):
         }
 
     # save_folder = f'./compression_mscoco_val30k'
-    save_folder = os.path.join("out", "mscoco_val30k", args.out)
+    if args.use_coco50:
+        save_folder = os.path.join("out", "coco50", args.out)
+    else:
+        save_folder = os.path.join("out", "mscoco_val30k", args.out)
+    # If output dir exists and is not empty, clear it
     if os.path.exists(save_folder):
-        shutil.rmtree(save_folder)
-    try:
-        os.mkdir(f"{save_folder}")
-        os.mkdir(f"{save_folder}/figures")
-        os.mkdir(f"{save_folder}/temp")
-    except:
-        os.makedirs(f"{save_folder}")
-        os.makedirs(f"{save_folder}/figures")
-        os.makedirs(f"{save_folder}/temp")
+        if os.listdir(save_folder):
+            shutil.rmtree(save_folder)
+    os.makedirs(f"{save_folder}", exist_ok=True)
+    os.makedirs(f"{save_folder}/figures", exist_ok=True)
+    os.makedirs(f"{save_folder}/temp", exist_ok=True)
 
     mean_csv = {
         'bpp':0.0,
@@ -162,6 +161,10 @@ def main(argv):
         'ms_ssim': 0.0,
         'lpips':0.0
     }
+
+    # Inference timing storage
+    inference_times = []
+    avg_times = {'clip_tokenize': 0.0, 'compress': 0.0, 'decompress': 0.0, 'total': 0.0}
 
     for img_name in tqdm(image_list, desc=f"compress:"):
         img_path = f'{args.image_folder_root}/{img_name}'
@@ -182,11 +185,16 @@ def main(argv):
         pred_bpp_list = []
 
         # For COCO5k, image_cap_dict is a defaultdict(list)
+        image_times = []
+        
         for caption in image_cap_dict[img_name]:
+            t0 = time.perf_counter()
             clip_token = CLIP_tokenizer([caption], padding="max_length", max_length=38, truncation=True, return_tensors="pt").to(device)
+            t1 = time.perf_counter()
             text_embeddings = CLIP_text_model(**clip_token).last_hidden_state
-
+            t2 = time.perf_counter ()
             out_enc = net.compress(x_padded, text_embeddings)
+            t3 = time.perf_counter()
             shape = out_enc["shape"]
 
             output = os.path.join(f'{save_folder}/temp', f'{img_name}')
@@ -201,13 +209,31 @@ def main(argv):
                 original_size = read_uints(f, 2)
                 strings, shape = read_body(f)
 
+            t4 = time.perf_counter()
             out = net.decompress(strings, shape, text_embeddings)
+            t5 = time.perf_counter()
             x_hat = out["x_hat"]
             x_hat = x_hat[:, :, 0 : original_size[0], 0 : original_size[1]]
 
             pred_image_list.append(x_hat.detach().clone())
             pred_bpp_list.append(bpp)
 
+            # Save times for this caption
+            image_times.append({
+                'clip_tokenize': t1-t0,
+                'compress': t3-t2,
+                'decompress': t5-t4,
+                'total': (t1-t0)+(t3-t2)+(t5-t4)
+            })
+        # Find the avg inference time for this img 
+        inference_times.append({
+            'image_name': img_name,
+            'clip_tokenize': sum([t['clip_tokenize'] for t in image_times]) / len(image_times),
+            'compress': sum([t['compress'] for t in image_times]) / len(image_times),
+            'decompress': sum([t['decompress'] for t in image_times]) / len(image_times),
+            'total': sum([t['total'] for t in image_times]) / len(image_times)
+        })
+            
         best_image = {
             'BPP':0.0,
             'PSNR': 0.0,
@@ -257,7 +283,7 @@ def main(argv):
 
     data_lpips_best = pd.DataFrame(stat_csv)
     data_lpips_best.to_csv(f'{save_folder}/stat_per_image.csv')
-        
+
     mean_csv['bpp'] /= len(image_list)
     mean_csv['psnr'] /= len(image_list)
     mean_csv['ms_ssim'] /= len(image_list)
@@ -270,5 +296,12 @@ def main(argv):
     with open(f'{save_folder}/mean_stat.json', 'w') as f:
         json.dump(mean_csv, f, indent=4)
 
-if __name__ == "__main__":
-    main(sys.argv[1:])
+    # Save inference times
+    df_times = pd.DataFrame(inference_times)
+    df_times.to_csv(f'{save_folder}/inference_times.csv', index=False)
+    avg_times['clip_tokenize'] = float(df_times['clip_tokenize'].mean())
+    avg_times['compress'] = float(df_times['compress'].mean())
+    avg_times['decompress'] = float(df_times['decompress'].mean())
+    avg_times['total'] = float(df_times['total'].mean())
+    with open(f'{save_folder}/avg_inference_times.json', 'w') as f:
+        json.dump(avg_times, f, indent=4)
