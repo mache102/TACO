@@ -5,3 +5,4 @@ for lambda in "${lambdas[@]}"; do
     # python -u generate_images_mscoco30k.py --image_folder_root /home/ying/datasets/MSCOCO/val2014 --checkpoint ./ckpts/lambda_${lambda}.pth.tar --out lambda_${lambda}
     python -u generate_images_mscoco30k.py --image_folder_root /home/ying/datasets/val2017 --checkpoint ./ckpts/lambda_${lambda}.pth.tar --out lambda_${lambda} --use_coco50
 done
+
